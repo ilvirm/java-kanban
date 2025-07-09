@@ -1,3 +1,5 @@
+package tracker.model;
+
 // Subtask наследуется от Task
 public class Subtask extends Task {
     private int epicId; //Добавляем epicID, чтобы понимать к какому эпику эта подзадача относится.
