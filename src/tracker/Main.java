@@ -1,11 +1,13 @@
 package tracker;
 
+//import tracker.controllers.InMemoryTaskManager;
+import tracker.controllers.Managers;
 import tracker.model.*;
 import tracker.controllers.TaskManager;
 
 public class Main {
     public static void main(String[] args) {
-        TaskManager manager = new TaskManager();
+        TaskManager manager = Managers.getDefault();
 
         // Создание 2 задач
         Task task1 = new Task("Сходить в магазин", "Купить продукты", Status.NEW);
