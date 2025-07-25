@@ -16,6 +16,17 @@ public class Task {
         this.status = status;
     }
 
+    // Копирующий конструктор.
+    // Чтобы при добавлении задачи в список, создавался новый объект (ссылка).
+
+    public Task(Task task) {
+        this.id = task.id;
+        this.title = task.title;
+        this.description = task.description;
+        this.status = task.status;
+    }
+
+
     public int getId() {
         return id;
     }

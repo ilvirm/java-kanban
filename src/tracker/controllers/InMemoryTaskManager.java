@@ -21,6 +21,11 @@ public class InMemoryTaskManager implements TaskManager {
         tasks.put(id, task);
     }
 
+    // Используется только для тестов — добавляет задачу с заданным вручную id
+    public void addTaskWithCustomId(Task task) {
+        tasks.put(task.getId(), task);
+    }
+
     @Override
     public Task getTask(int id) {
         return tasks.get(id);
@@ -98,6 +103,10 @@ public class InMemoryTaskManager implements TaskManager {
         Epic epic = epics.get(subtask.getEpicId());
         if (epic == null) {
             throw new IllegalArgumentException("Нельзя создать подзадачу без существующего эпика (id=" + subtask.getEpicId() + ")");
+        }
+
+        if (subtask.getId() != 0 && subtask.getId() == subtask.getEpicId()) {
+            throw new IllegalArgumentException("Ошибка: подзадача не может быть своим же эпиком (id=" + subtask.getId() + ")");
         }
 
         int id = generateId();
