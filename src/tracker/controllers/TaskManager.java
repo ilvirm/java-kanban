@@ -79,13 +79,7 @@ public class TaskManager {
     }
 
     public void clearEpics() {
-        /* Удаляются только те подзадачи, которые связаны с эпиками.
-        for (Epic epic : epics.values()) {
-            for (int subId : epic.getSubtaskIds()) {
-                subtasks.remove(subId);
-            }
-        }
-        */
+
         // Все подзадачи связаны только с эпиками, поэтому можно удалить все подзадачи.
         subtasks.clear();  // Удаляем все подзадачи сразу
         epics.clear();
@@ -93,32 +87,24 @@ public class TaskManager {
 
     // --- SUBTASK ---
 
+    /**
+     * Добавляет подзадачу в менеджер, если существует связанный эпик.
+     * Если эпик с указанным ID не найден, выбрасывает исключение.
+     *
+     * @param subtask подзадача, которую необходимо добавить
+     * @throws IllegalArgumentException если эпик с указанным ID не существует
+     */
     public void addSubtask(Subtask subtask) {
+        Epic epic = epics.get(subtask.getEpicId());
+        if (epic == null) {
+            throw new IllegalArgumentException("Нельзя создать подзадачу без существующего эпика (id=" + subtask.getEpicId() + ")");
+        }
 
-        /*
-        //Добавляли подзадачу, а только потом проверяли, существует ли нужный эпик.
         int id = generateId();
         subtask.setId(id);
         subtasks.put(id, subtask);
-
-        Epic epic = epics.get(subtask.getEpicId());
-        if (epic != null) {
-            epic.addSubtaskId(id);
-            updateEpicStatus(epic);
-        }
-        */
-
-        // Не создаем подзадачу, пока не убедились, что существует эпик, к которому она относится.
-        Epic epic = epics.get(subtask.getEpicId());
-        if (epic != null) {
-            int id = generateId();
-            subtask.setId(id);
-            subtasks.put(id, subtask);
-            epic.addSubtaskId(id);
-            updateEpicStatus(epic);
-        } else {
-            System.out.println("Ошибка: нельзя создать подзадачу без существующего эпика (id=" + subtask.getEpicId() + ")");
-        }
+        epic.addSubtaskId(id);
+        updateEpicStatus(epic);
     }
 
     public Subtask getSubtask(int id) {
