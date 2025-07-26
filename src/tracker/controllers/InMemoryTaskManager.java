@@ -4,6 +4,7 @@ import tracker.model.*;
 
 import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.List;
 
 public class InMemoryTaskManager implements TaskManager {
     private int currentId = 1;
@@ -11,6 +12,9 @@ public class InMemoryTaskManager implements TaskManager {
     private final HashMap<Integer, Task> tasks = new HashMap<>();
     private final HashMap<Integer, Epic> epics = new HashMap<>();
     private final HashMap<Integer, Subtask> subtasks = new HashMap<>();
+
+    // Ддобавлена переменная-ссылка на менеджер истории
+    private final HistoryManager historyManager = Managers.getDefaultHistory();
 
     // --- TASK ---
 
@@ -28,7 +32,11 @@ public class InMemoryTaskManager implements TaskManager {
 
     @Override
     public Task getTask(int id) {
-        return tasks.get(id);
+        final Task task = tasks.get(id);
+        if (task != null) {
+            historyManager.add(task);  // добавляем в историю только если задача найдена
+        }
+        return task;
     }
 
     @Override
@@ -64,7 +72,12 @@ public class InMemoryTaskManager implements TaskManager {
 
     @Override
     public Epic getEpic(int id) {
-        return epics.get(id);
+        final Epic epic = epics.get(id);
+        // Добавляем просмотренный эпик в историю
+        if (epic != null) {
+            historyManager.add(epic);
+        }
+        return epic;
     }
 
     @Override
@@ -118,7 +131,12 @@ public class InMemoryTaskManager implements TaskManager {
 
     @Override
     public Subtask getSubtask(int id) {
-        return subtasks.get(id);
+        final Subtask subtask = subtasks.get(id);
+        // Добавляем просмотренную подзадачу в историю
+        if (subtask != null) {
+            historyManager.add(subtask);
+        }
+        return subtask;
     }
 
     @Override
@@ -169,6 +187,14 @@ public class InMemoryTaskManager implements TaskManager {
         }
         subtasks.clear();
     }
+
+    // --- HISTORY ---
+
+    @Override
+    public List<Task> getHistory() {
+        return historyManager.getHistory();
+    }
+
 
     // --- PRIVATE HELPERS ---
 

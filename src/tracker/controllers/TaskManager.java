@@ -5,6 +5,7 @@ import tracker.model.Subtask;
 import tracker.model.Task;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public interface TaskManager {
     void addTask(Task task);
@@ -44,4 +45,13 @@ public interface TaskManager {
     void removeSubtask(int id);
 
     void clearSubtasks();
+
+    // --- HISTORY ---
+
+    /*
+     * Возвращает список последних просмотренных задач.
+     * Порядок — от самой старой к самой новой.
+     *
+     */
+    List<Task> getHistory();  // 🔧 Добавлен метод истории
 }
