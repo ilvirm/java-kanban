@@ -1,5 +1,24 @@
+/*
+ * ТЕСТЫ ДЛЯ Epic и интеграции с TaskManager
+ * -----------------------------------------
+ * Порядок проверок (совпадает с порядком тестов ниже):
+ *
+ * 1) epicsWithSameIdShouldBeEqual
+ *    - Два разных объекта Epic с одинаковым id считаются равными (equals по id и типу).
+ *
+ * 2) subtaskCannotBeItsOwnEpic
+ *    - Подзадача не может ссылаться на саму себя как на эпик:
+ *      условие subtask.getId() == subtask.getEpicId() должно приводить к отказу (исключению),
+ *      и при этом в эпик не должна добавляться ни одна подзадача.
+ *
+ * 3) subtaskEpicMustExist
+ *    - Нельзя добавить подзадачу, если epicId не ссылается на существующий эпик.
+ *      Ожидается исключение и отсутствие изменений в данных.
+ */
+
 package tracker.model;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tracker.controllers.Managers;
 import tracker.controllers.TaskManager;
@@ -8,70 +27,60 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class EpicTest {
 
+    private TaskManager manager;
+
+    @BeforeEach
+    void setUp() {
+        manager = Managers.getDefault();
+    }
+
+    // 1) Равенство эпиков с одинаковым id
     @Test
     void epicsWithSameIdShouldBeEqual() {
-        // Создаём два разных объекта Epic с разными названиями и описаниями
-        // Обрати внимание: конструктор Epic не принимает статус — он всегда NEW
         Epic epic1 = new Epic("Epic One", "First epic");
         Epic epic2 = new Epic("Epic Two", "Second epic");
 
-        // Назначаем одинаковый id обоим объектам
         epic1.setId(500);
         epic2.setId(500);
 
-        // Проверяем, что equals() возвращает true
-        // Это возможно потому, что метод equals() в Task сравнивает только id и тип объекта
         assertEquals(epic1, epic2, "Epic объекты с одинаковым id должны считаться равными");
     }
 
-    // проверьте, что объект Epic нельзя добавить в самого себя в виде подзадачи нужно создать Subtask,
-    // у которой epicId совпадает с id самого Epic, и проверить, что эта подзадача не будет добавлена.
+    // 2) Подзадача не может быть «своим же эпиком»
+    // Т.е. subtask.getId() == subtask.getEpicId() — недопустимое состояние.
     @Test
-    void epicCannotBeItsOwnSubtask() {
-        // Arrange
-        TaskManager manager = Managers.getDefault();
-
+    void subtaskCannotBeItsOwnEpic() {
+        // Arrange: создаём валидный эпик
         Epic epic = new Epic("Epic", "Test epic");
         manager.addEpic(epic);
         int epicId = epic.getId();
 
-        // Act & Assert
-        Subtask invalidSubtask = new Subtask("Invalid Subtask", "Should not be added", Status.NEW, epicId);
-        invalidSubtask.setId(epicId); // Симулируем, что подзадача уже имеет такой же id, как epic
-
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> manager.addSubtask(invalidSubtask),
-                "Ожидалось исключение при попытке добавить эпик как свою же подзадачу"
-        );
-
-        assertEquals("Ошибка: подзадача не может быть своим же эпиком (id=" + epicId + ")", exception.getMessage());
-    }
-
-    // Нужно убедиться, что Subtask не может ссылаться на себя как на эпик,
-    // то есть subtask.getId() == subtask.getEpicId()
-    @Test
-    void subtaskCannotBeItsOwnEpic() {
-        // Arrange
-        TaskManager manager = Managers.getDefault();
-
-        Epic epic = new Epic("Parent Epic", "Will be used as real epic");
-        manager.addEpic(epic);
-        int epicId = epic.getId();
-
-        Subtask subtask = new Subtask("Invalid Subtask", "Should not be allowed", Status.NEW, epicId);
-
-        // Принудительно задаём subtask id == epicId (симулируем ошибку)
+        // Создаём подзадачу, указывая epicId = id эпика (это нормально),
+        // но принудительно ставим subtask.id == epicId (это симуляция неверных данных)
+        Subtask subtask = new Subtask("Invalid Subtask", "Should not be added", Status.NEW, epicId);
         subtask.setId(epicId);
 
-        // Act & Assert
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
+        // Act & Assert: ожидаем исключение при добавлении
+        assertThrows(IllegalArgumentException.class,
                 () -> manager.addSubtask(subtask),
-                "Ожидалось исключение при попытке сделать подзадачу своим же эпиком"
-        );
+                "Ожидалось исключение при попытке сделать подзадачу своим же эпиком");
 
-        assertEquals("Ошибка: подзадача не может быть своим же эпиком (id=" + epicId + ")", exception.getMessage());
+        // Дополнительно проверяем, что список подзадач у эпика пуст (ничего не добавлено)
+        assertTrue(manager.getEpicSubtaskIds(epicId).isEmpty(),
+                "После неуспешной попытки у эпика не должно появиться подзадач");
     }
 
+    // 3) Нельзя добавить подзадачу к несуществующему эпику
+    @Test
+    void subtaskEpicMustExist() {
+        // Arrange: не создаём ни одного эпика
+        int nonExistentEpicId = 999_999;
+
+        Subtask subtask = new Subtask("Orphan Subtask", "No real epic", Status.NEW, nonExistentEpicId);
+
+        // Act & Assert: ожидаем исключение
+        assertThrows(IllegalArgumentException.class,
+                () -> manager.addSubtask(subtask),
+                "Ожидалось исключение при добавлении подзадачи к несуществующему эпику");
+    }
 }

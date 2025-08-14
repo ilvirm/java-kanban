@@ -54,4 +54,6 @@ public interface TaskManager {
      *
      */
     List<Task> getHistory();  // 🔧 Добавлен метод истории
+
+    List<Integer> getEpicSubtaskIds(int epicId);
 }
