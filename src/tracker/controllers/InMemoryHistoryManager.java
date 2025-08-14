@@ -39,16 +39,13 @@ import java.util.Map; // Интерфейс. Чтобы находить и уд
 
 public class InMemoryHistoryManager implements HistoryManager {
 
-    //  private static final int HISTORY_LIMIT = 10;
-    //  private final LinkedList<Task> history = new LinkedList<>();
-
     // Узел собственного двусвязного списка
-    private static class Node<T> {
-        T data;
-        Node<T> prev;
-        Node<T> next;
+    private static class Node {
+        final Task data;
+        Node prev;
+        Node next;
 
-        Node(Node<T> prev, T data, Node<T> next) {
+        Node(Node prev, Task data, Node next) {
             this.prev = prev;
             this.data = data;
             this.next = next;
@@ -56,32 +53,26 @@ public class InMemoryHistoryManager implements HistoryManager {
     }
 
     // Голова/хвост двусвязного списка
-    private Node<Task> head;
-    private Node<Task> tail;
+    private Node head;
+    private Node tail;
 
     //Индекс для O(1) доступа к узлу по id задачи
-    private final Map<Integer, Node<Task>> index = new HashMap<>();
+    private final Map<Integer, Node> index = new HashMap<>();
 
     @Override
     public void add(Task task) {
         if (task == null) return;
 
-        // Legacy (до перехода на двусвязный список + Map):
-        // history.add(new Task(task));
-        // if (history.size() > HISTORY_LIMIT) {
-        //     history.removeFirst();
-        // }
-
         // Текущая реализация: без лимита, без дублей, O(1) add/remove
 
         // Если задача уже была в истории — удаляем её прежний узел за O(1).
-        Node<Task> old = index.remove(task.getId());
+        Node old = index.remove(task.getId());
         if (old != null) {
             removeNode(old);
         }
 
         // Добавляем новый просмотр в хвост и обновляем индекс.
-        Node<Task> node = linkLast(task);
+        Node node = linkLast(task);
         index.put(task.getId(), node);
 
     }
@@ -91,7 +82,7 @@ public class InMemoryHistoryManager implements HistoryManager {
 
         // Удаляем просмотр по id без обхода списка —
         // берём узел из Map и вырезаем его за O(1).
-        Node<Task> node = index.remove(id);
+        Node node = index.remove(id);
         if (node != null) {
             removeNode(node);
         }
@@ -101,7 +92,7 @@ public class InMemoryHistoryManager implements HistoryManager {
     public List<Task> getHistory() {
         //return new LinkedList<>(history); // Возвращаем копию, чтобы не нарушать инкапсуляцию
         List<Task> result = new ArrayList<>(index.size()); //Инициализируем ArrayList с известным размером
-        Node<Task> cur = head;
+        Node cur = head;
         while (cur != null) {
             result.add(cur.data);
             cur = cur.next;
@@ -112,8 +103,8 @@ public class InMemoryHistoryManager implements HistoryManager {
 
     // ** Помощники **
     // добавить элемент в хвост списка (последний просмотр)
-    private Node<Task> linkLast(Task task) {
-        Node<Task> node = new Node<>(tail, task, null);
+    private Node linkLast(Task task) {
+        Node node = new Node(tail, task, null);
         if (tail != null) {
             tail.next = node;
         } else {
@@ -124,9 +115,9 @@ public class InMemoryHistoryManager implements HistoryManager {
     }
 
     // NEW: удалить узел из середины/головы/хвоста за O(1)
-    private void removeNode(Node<Task> node) {
-        Node<Task> prev = node.prev;
-        Node<Task> next = node.next;
+    private void removeNode(Node node) {
+        Node prev = node.prev;
+        Node next = node.next;
 
         if (prev != null) {
             prev.next = next;
@@ -143,6 +134,5 @@ public class InMemoryHistoryManager implements HistoryManager {
         // Разрываем ссылки, чтобы освободить память
         node.prev = null;
         node.next = null;
-        node.data = null;
     }
 }

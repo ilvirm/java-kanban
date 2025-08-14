@@ -54,10 +54,14 @@ public class InMemoryTaskManager implements TaskManager {
     @Override
     public void removeTask(int id) {
         tasks.remove(id);
+        historyManager.remove(id);
     }
 
     @Override
     public void clearTasks() {
+        for (Integer id : tasks.keySet()) {
+            historyManager.remove(id);
+        }
         tasks.clear();
     }
 
@@ -97,7 +101,9 @@ public class InMemoryTaskManager implements TaskManager {
     public void removeEpic(int id) {
         Epic epic = epics.remove(id);
         if (epic != null) {
+            historyManager.remove(id);
             for (int subtaskId : epic.getSubtaskIds()) {
+                historyManager.remove(subtaskId);
                 subtasks.remove(subtaskId);
             }
         }
@@ -105,7 +111,14 @@ public class InMemoryTaskManager implements TaskManager {
 
     @Override
     public void clearEpics() {
+        for (Integer sid : subtasks.keySet()) {
+            historyManager.remove(sid);
+        }
         subtasks.clear();
+
+        for (Integer eid : epics.keySet()) {
+            historyManager.remove(eid);
+        }
         epics.clear();
     }
 
@@ -171,6 +184,7 @@ public class InMemoryTaskManager implements TaskManager {
     public void removeSubtask(int id) {
         Subtask subtask = subtasks.remove(id);
         if (subtask != null) {
+            historyManager.remove(id);
             Epic epic = epics.get(subtask.getEpicId());
             if (epic != null) {
                 epic.removeSubtaskId(id);
@@ -181,10 +195,16 @@ public class InMemoryTaskManager implements TaskManager {
 
     @Override
     public void clearSubtasks() {
+        // разово чистим историю по всем подзадачам
+        for (Integer sid : subtasks.keySet()) {
+            historyManager.remove(sid);
+        }
+        // очищаем ссылки у эпиков и обновляем их статусы
         for (Epic epic : epics.values()) {
             epic.clearSubtasks();
             updateEpicStatus(epic);
         }
+        // очищаем хранилище подзадач
         subtasks.clear();
     }
 
