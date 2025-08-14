@@ -188,6 +188,17 @@ public class InMemoryTaskManager implements TaskManager {
         subtasks.clear();
     }
 
+    @Override
+    public List<Integer> getEpicSubtaskIds(int epicId) {
+        Epic epic = epics.get(epicId);
+        if (epic == null) {
+            return List.of(); // или можно бросить IllegalArgumentException
+        }
+        // Возвращаем копию, чтобы не дать внешнему коду мутировать внутренний список
+        return new ArrayList<>(epic.getSubtaskIds());
+    }
+
+
     // --- HISTORY ---
 
     @Override
