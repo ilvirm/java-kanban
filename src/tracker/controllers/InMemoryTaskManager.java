@@ -7,14 +7,43 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class InMemoryTaskManager implements TaskManager {
-    private int currentId = 1;
+    // currentId делаем доступным наследнику.
+    protected int currentId = 1;
 
-    private final HashMap<Integer, Task> tasks = new HashMap<>();
-    private final HashMap<Integer, Epic> epics = new HashMap<>();
-    private final HashMap<Integer, Subtask> subtasks = new HashMap<>();
+    // Делаем коллекции доступными наследнику
+    protected final HashMap<Integer, Task> tasks = new HashMap<>();
+    protected final HashMap<Integer, Epic> epics = new HashMap<>();
+    protected final HashMap<Integer, Subtask> subtasks = new HashMap<>();
 
-    // Ддобавлена переменная-ссылка на менеджер истории
+    // Добавлена переменная-ссылка на менеджер истории
     private final HistoryManager historyManager = Managers.getDefaultHistory();
+
+    // --- FileBackedTaskManager ---
+
+    /** Устанавливает nextId (= maxId+1) при восстановлении из файла. */
+    protected final void setNextId(int nextId) {
+        this.currentId = Math.max(nextId, this.currentId);
+    }
+
+    /** Вставка Task с уже заданным id (без генерации id и без истории). */
+    protected final void addTaskWithCustomId(Task task) {
+        tasks.put(task.getId(), task);
+    }
+
+    /** Вставка Epic с уже заданным id (без генерации id и без истории). */
+    protected final void addEpicWithCustomId(Epic epic) {
+        epics.put(epic.getId(), epic);
+    }
+
+    /** Вставка Subtask с уже заданным id + привязка к эпику + пересчёт статуса эпика. */
+    protected final void addSubtaskWithCustomId(Subtask subtask) {
+        subtasks.put(subtask.getId(), subtask);
+        Epic epic = epics.get(subtask.getEpicId());
+        if (epic != null) {
+            epic.addSubtaskId(subtask.getId());
+            updateEpicStatus(epic);
+        }
+    }
 
     // --- TASK ---
 
@@ -23,11 +52,6 @@ public class InMemoryTaskManager implements TaskManager {
         int id = generateId();
         task.setId(id);
         tasks.put(id, task);
-    }
-
-    // Используется только для тестов — добавляет задачу с заданным вручную id
-    public void addTaskWithCustomId(Task task) {
-        tasks.put(task.getId(), task);
     }
 
     @Override
