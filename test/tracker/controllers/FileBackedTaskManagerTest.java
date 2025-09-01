@@ -132,15 +132,16 @@ class FileBackedTaskManagerTest {
         Epic reEpic = restored.getAllEpics().get(0); // один эпик — безопасно брать по индексу
         List<Integer> subIds = restored.getEpicSubtaskIds(reEpic.getId());
         assertEquals(2, subIds.size(), "У эпика должно быть 2 подзадачи");
-        for (int sid : subIds) {
-            assertNotNull(restored.getSubtask(sid), "Подзадача с id=" + sid + " должна существовать");
-        }
 
         // История восстановилась и в правильном порядке
         List<Task> hist = restored.getHistory();
         assertEquals(2, hist.size(), "В истории должно быть 2 записи");
         assertEquals(t1.getId(), hist.get(0).getId(), "Сначала должен быть просмотр T1");
         assertEquals(s2.getId(), hist.get(1).getId(), "Затем просмотр S2");
+
+        for (int sid : subIds) {
+            assertNotNull(restored.getSubtask(sid), "Подзадача с id=" + sid + " должна существовать");
+        }
 
         // nextId продолжился (новая задача получает id больше максимального из файла)
         int beforeMax = maxId(restored);

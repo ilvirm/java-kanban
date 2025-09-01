@@ -1,4 +1,4 @@
-package tracker.controllers;
+package tracker.exceptions;
 
 /**
  * Исключение для ошибок сохранения/загрузки задач.
