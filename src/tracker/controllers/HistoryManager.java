@@ -11,6 +11,8 @@ public interface HistoryManager {
      */
     void add(Task task);
 
+    void remove(int id); //Добавляем метод для удаления задачи из просмотра
+
     /**
      * Возвращает список последних просмотренных задач (до 10 штук).
      *
