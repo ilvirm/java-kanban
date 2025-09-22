@@ -370,6 +370,17 @@ public class InMemoryTaskManager implements TaskManager {
         return historyManager.getHistory();
     }
 
+
+    /**
+     * SPRINT-8: добавить запись в историю без побочных эффектов.
+     * Нужен для FileBackedTaskManager.loadFromFile(..), чтобы не дёргать публичные get*().
+     */
+    protected void addToHistoryDirect(Task t) {
+        if (t != null) {
+            historyManager.add(t);
+        }
+    }
+
     // --- NEW (SPRINT-8): приоритетный список для планирования
     @Override
     public List<Task> getPrioritizedTasks() {
