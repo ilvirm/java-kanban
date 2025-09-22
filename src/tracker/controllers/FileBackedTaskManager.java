@@ -298,30 +298,23 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
             // nextId = maxId+1
             mgr.setNextId(maxId + 1);
 
-            // --- SPRINT-8: пересчитать агрегаты эпиков после загрузки (status/start/duration/end)
-            for (Epic e : mgr.getAllEpics()) {
-                mgr.updateEpicStatus(e);
-            }
-
-            // история (если есть строки ещё) — без побочных эффектов (не вызываем get*())
+            // 1) СНАЧАЛА восстановить историю — строго в записанном порядке (без get* и без save())
             if (i < lines.size()) {
                 String historyLine = lines.get(i).trim();
                 if (!historyLine.isEmpty()) {
                     for (String part : historyLine.split(",")) {
                         int hid = Integer.parseInt(part.trim());
-
-                        // Берём прямой объект по id из внутренних карт
                         Task t = mgr.tasks.get(hid);
-                        if (t == null) {
-                            t = mgr.epics.get(hid);
-                        }
-                        if (t == null) {
-                            t = mgr.subtasks.get(hid);
-                        }
-                        // Кладём в историю напрямую (без save(), без дублирования вызовов get*())
+                        if (t == null) t = mgr.epics.get(hid);
+                        if (t == null) t = mgr.subtasks.get(hid);
                         mgr.addToHistoryDirect(t);
                     }
                 }
+            }
+
+            // 2) ПОТОМ пересчитать агрегаты по всем эпикам (status/start/duration/end)
+            for (Epic e : mgr.getAllEpics()) {
+                mgr.updateEpicStatus(e); // важно: не updateEpic(e), чтобы не было save()
             }
 
             return mgr;
