@@ -1,110 +1,89 @@
 /*
- * ТЕСТЫ ДЛЯ InMemoryTaskManager
- * -----------------------------
- * Порядок и содержание проверок (соответствует порядку тестов ниже):
+ * SPRINT-8: Тесты для InMemoryTaskManager
+ * ---------------------------------------
+ * Этот класс — «тонкий» адаптер над базовым TaskManagerTest<T>.
  *
- * 1) addsAndFindsTasksById
- *    - Менеджер добавляет задачи всех типов (Task/Epic/Subtask) и возвращает их по id.
+ * 1) Мы наследуемся от TaskManagerTest<InMemoryTaskManager>, чтобы получить ВСЕ
+ *    базовые проверки спринта-8:
+ *    - добавление/получение Task/Epic/Subtask;
+ *    - getSubtasksOfEpic(...) переписан на Stream API;
+ *    - getPrioritizedTasks(): сортировка по startTime, записи без времени не участвуют;
+ *    - проверка пересечений (add и update бросают исключение при конфликте);
+ *    - расчёт агрегатов эпика (status/start/duration/end) по сабтаскам.
  *
- * 2) manualAndGeneratedIdDoNotConflict
- *    - Ручной id не конфликтует с автоматически сгенерированными id:
- *      обе задачи доступны по своим id, и количество задач корректно.
- *
- * 3) taskFieldsRemainUnchangedAfterAdding
- *    - Поля задачи после добавления не меняются (совпадают с исходными значениями).
+ * 2) Дополнительно здесь есть два узкоспецифичных теста InMemoryTaskManager:
+ *    - prioritizedDoesNotContainEpics(): эпики не попадают в приоритетный список;
+ *    - hasOverlaps_ignoresTasksWithoutTime(): задачи без времени не считаются конфликтными
+ *      и допускаются к добавлению; они не попадают в приоритетный список.
  */
 
 package tracker.controllers;
 
-//один менеджер на тест через @BeforeEach, чтобы тесты не зависели друг от друга
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tracker.model.Epic;
 import tracker.model.Status;
 import tracker.model.Subtask;
 import tracker.model.Task;
 
+import java.time.Duration;
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
-public class InMemoryTaskManagerTest {
+public class InMemoryTaskManagerTest extends TaskManagerTest<InMemoryTaskManager> {
 
-    private InMemoryTaskManager manager;
-
-    @BeforeEach
-    void setUp() {
-        manager = new InMemoryTaskManager();
+    /** Подкладываем конкретную реализацию менеджера в общий набор тестов. */
+    @Override
+    protected InMemoryTaskManager createManager() {
+        return new InMemoryTaskManager();
     }
 
-    // 1) Менеджер добавляет и находит сущности по id
-    @Test
-    void addsAndFindsTasksById() {
-        // --- Добавляем обычную задачу ---
-        Task task = new Task("Task", "Simple task", Status.NEW);
-        manager.addTask(task);
-        int taskId = task.getId();
-
-        // --- Добавляем эпик ---
-        Epic epic = new Epic("Epic", "Parent epic");
-        manager.addEpic(epic);
-        int epicId = epic.getId();
-
-        // --- Добавляем подзадачу ---
-        Subtask subtask = new Subtask("Subtask", "Child of epic", Status.NEW, epicId);
-        manager.addSubtask(subtask);
-        int subtaskId = subtask.getId();
-
-        // --- Проверка по id ---
-        assertEquals(task,    manager.getTask(taskId),     "Не удалось получить Task по id");
-        assertEquals(epic,    manager.getEpic(epicId),     "Не удалось получить Epic по id");
-        assertEquals(subtask, manager.getSubtask(subtaskId),"Не удалось получить Subtask по id");
-    }
-
-    /*
-     * 2) Ручной id + авто-id не конфликтуют
-     * Шаги:
-     *  - добавляем задачу с вручную заданным id (через безопасный метод addTaskWithCustomId)
-     *  - добавляем задачу с авто-id
-     *  - убеждаемся, что обе доступны по своим id и не перетёрли друг друга
+    /**
+     * SPRINT-8: Приоритизированный список не должен содержать эпики.
+     *
+     * Почему: приоритизация — это «план исполняемых работ», туда попадают Task и Subtask.
+     * Эпик — агрегирующая сущность; у неё расчётные поля времени, но сама она не исполняется.
      */
     @Test
-    void manualAndGeneratedIdDoNotConflict() {
-        // Добавляем задачу с вручную заданным id
-        Task manualTask = new Task("Manual Task", "Created manually", Status.NEW);
-        manualTask.setId(1000);
-        manager.addTaskWithCustomId(manualTask); // используем безопасный метод, чтобы не ломать генератор id
+    void prioritizedDoesNotContainEpics() {
+        Epic epic = new Epic("E", "desc");
+        manager.addEpic(epic);
 
-        // Добавляем задачу с автоматически сгенерированным id
-        Task generatedTask = new Task("Generated Task", "Created via manager", Status.NEW);
-        manager.addTask(generatedTask);
-        int generatedId = generatedTask.getId();
+        // Добавим сабтаски, чтобы у эпика посчитались агрегаты времени:
+        Subtask s1 = new Subtask("S1", "d", Status.NEW, epic.getId(),
+                base.plusMinutes(10), Duration.ofMinutes(30));
+        Subtask s2 = new Subtask("S2", "d", Status.NEW, epic.getId(),
+                base.plusMinutes(60), Duration.ofMinutes(30));
+        manager.addSubtask(s1);
+        manager.addSubtask(s2);
 
-        // --- Проверки ---
-        assertEquals(manualTask,    manager.getTask(1000),     "Ручная задача с id=1000 не найдена");
-        assertEquals(generatedTask, manager.getTask(generatedId),"Сгенерированная задача не найдена");
-        assertNotEquals(1000, generatedId,                     "Сгенерированный id не должен совпадать с ручным");
-        assertEquals(2, manager.getAllTasks().size(),          "Должно быть две задачи в системе");
+        List<Task> pr = manager.getPrioritizedTasks();
+        assertTrue(pr.containsAll(List.of(s1, s2)), "Сабтаски должны быть в приоритизированном списке");
+        assertFalse(pr.contains(epic), "Эпик не должен попадать в приоритизированный список");
     }
 
-    // 3) Поля задачи остаются неизменными после добавления в менеджер
+    /**
+     * SPRINT-8: Задачи без времени не считаются пересекающимися и допускаются к добавлению.
+     *
+     * Проверяем два момента:
+     *  1) hasOverlaps(...) для задачи без startTime/duration возвращает false;
+     *  2) addTask(...) не бросает при добавлении такой задачи;
+     *  3) задача без времени НЕ попадает в приоритетный список.
+     */
     @Test
-    void taskFieldsRemainUnchangedAfterAdding() {
-        // Arrange — создаём задачу
-        String title = "Test Task";
-        String description = "This is a test task";
-        Status status = Status.NEW;
+    void hasOverlaps_ignoresTasksWithoutTime() {
+        // Базовая «занятая» задача со временем: [09:00, 10:00)
+        Task a = new Task("A", "with time", Status.NEW, base, Duration.ofMinutes(60));
+        manager.addTask(a);
 
-        Task originalTask = new Task(title, description, status);
+        // Кандидат без времени (startTime == null). duration можно не задавать вовсе — логика игнорирует любую «пустоту».
+        Task b = new Task("B", "no time", Status.NEW, null, null);
 
-        // Act — добавляем в менеджер
-        manager.addTask(originalTask);
-        int taskId = originalTask.getId(); // id устанавливается менеджером
-        Task retrievedTask = manager.getTask(taskId);
+        assertFalse(manager.hasOverlaps(b), "Задача без времени не должна считаться пересекающейся");
+        assertDoesNotThrow(() -> manager.addTask(b), "Добавление задачи без времени не должно кидать исключение");
 
-        // Assert — проверяем, что поля совпадают
-        assertNotNull(retrievedTask, "Задача должна быть найдена в менеджере");
-        assertEquals(title,       retrievedTask.getTitle(),       "Заголовок задачи не совпадает");
-        assertEquals(description, retrievedTask.getDescription(), "Описание задачи не совпадает");
-        assertEquals(status,      retrievedTask.getStatus(),      "Статус задачи не совпадает");
-        assertEquals(taskId,      retrievedTask.getId(),          "ID задачи должен совпадать после добавления");
+        // В приоритизации остаётся только «A» (у неё есть startTime). «B» в список не попадает.
+        List<Task> pr = manager.getPrioritizedTasks();
+        assertEquals(List.of(a), pr, "Задача без времени не должна участвовать в приоритизации");
     }
 }

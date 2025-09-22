@@ -1,77 +1,89 @@
-/*
- * ТЕСТЫ ДЛЯ Subtask (модельный уровень)
- * -------------------------------------
- * Порядок проверок (совпадает с порядком тестов ниже):
- *
- * 1) subtasksWithSameIdShouldBeEqual
- *    - Две разные подзадачи с одинаковым id считаются равными (equals по id).
- *
- * 2) subtasksWithDifferentIdsShouldNotBeEqual
- *    - Подзадачи с разными id не равны, даже если остальные поля совпадают.
- *
- * 3) equalsHashCodeContract
- *    - Согласованность equals/hashCode: одинаковые id → одинаковый hashCode.
- *
- * 4) epicIdIsStoredAndCanBeChanged
- *    - Subtask корректно хранит epicId и позволяет его изменить (если это предусмотрено моделью).
- *      (Примечание: проверка валидности epicId и существования эпика — задача уровня TaskManager,
- *       и тестируется отдельно в интеграционных тестах.)
- */
-
 package tracker.model;
 
+/*
+ * SPRINT-8: Тесты для модели Subtask
+ * -----------------------------------
+ * Проверяем:
+ *
+ * 1) Поля времени:
+ *    - duration (Duration) — длительность в минутах.
+ *    - startTime (LocalDateTime) — дата/время начала.
+ *    - getEndTime() — вычисляемое окончание = startTime + duration.
+ *
+ * 2) Граничные случаи для времени:
+ *    - Если startTime == null ИЛИ duration == null, то endTime == null.
+ *
+ * 3) Привязка к эпику:
+ *    - epicId, переданный в конструктор, сохраняется как есть и доступен через getEpicId().
+ *
+ * Важно:
+ *  — Здесь мы НЕ проверяем бизнес-правила менеджера (например, что сабтаск нельзя создать без существующего эпика
+ *    или что сабтаск не может «принадлежать сам себе») — это ответственность TaskManager и тестируется отдельно.
+ */
+
 import org.junit.jupiter.api.Test;
+
+import java.time.Duration;
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class SubtaskTest {
 
-    // 1) Равенство по одинаковому id
+    private final LocalDateTime base = LocalDateTime.of(2025, 1, 1, 9, 0);
+
+    // 1) Конструктор с временем и epicId — все поля сохраняются, end = start + duration
     @Test
-    void subtasksWithSameIdShouldBeEqual() {
-        Subtask s1 = new Subtask("Read book", "Chapter 1", Status.NEW, 1);
-        Subtask s2 = new Subtask("Write report", "Chapter 2", Status.IN_PROGRESS, 2);
+    void ctor_withTimeAndEpicId_preservesFields_andComputesEnd() {
+        int epicId = 42;
+        LocalDateTime start = base.plusMinutes(15);
+        Duration dur = Duration.ofMinutes(45);
 
-        s1.setId(100);
-        s2.setId(100);
+        Subtask s = new Subtask("Sub", "desc", Status.NEW, epicId, start, dur);
 
-        assertEquals(s1, s2, "Subtask объекты с одинаковым id должны считаться равными");
+        assertEquals("Sub", s.getTitle());
+        assertEquals("desc", s.getDescription());
+        assertEquals(Status.NEW, s.getStatus());
+        assertEquals(epicId, s.getEpicId());
+
+        assertEquals(start, s.getStartTime());
+        assertEquals(dur,   s.getDuration());
+        assertEquals(start.plus(dur), s.getEndTime());
     }
 
-    // 2) Неравенство при разных id (даже если остальные поля совпадают)
+    // 2) Если start == null, то end == null (даже при заданной duration)
     @Test
-    void subtasksWithDifferentIdsShouldNotBeEqual() {
-        Subtask s1 = new Subtask("Task", "Desc", Status.NEW, 10);
-        Subtask s2 = new Subtask("Task", "Desc", Status.NEW, 10);
+    void endTime_isNull_whenStartIsNull() {
+        int epicId = 7;
+        Subtask s = new Subtask("S", "d", Status.NEW, epicId, null, Duration.ofMinutes(30));
 
-        s1.setId(1);
-        s2.setId(2);
-
-        assertNotEquals(s1, s2, "Subtask с разными id не должны быть равны");
+        assertNull(s.getStartTime());
+        assertEquals(Duration.ofMinutes(30), s.getDuration());
+        assertNull(s.getEndTime(), "Без startTime вычислять endTime нельзя");
     }
 
-    // 3) Контракт equals/hashCode: одинаковые id → одинаковый hashCode
+    // 3) Если duration == null, то end == null (даже при заданном start)
     @Test
-    void equalsHashCodeContract() {
-        Subtask a = new Subtask("A", "D", Status.NEW, 5);
-        Subtask b = new Subtask("B", "E", Status.DONE, 7);
+    void endTime_isNull_whenDurationIsNull() {
+        int epicId = 8;
+        LocalDateTime start = base.plusMinutes(5);
+        Subtask s = new Subtask("S", "d", Status.NEW, epicId, start, null);
 
-        a.setId(777);
-        b.setId(777);
-
-        assertEquals(a, b, "Подзадачи с одинаковым id должны быть равны");
-        assertEquals(a.hashCode(), b.hashCode(), "Равные объекты должны иметь одинаковый hashCode");
+        assertEquals(start, s.getStartTime());
+        assertNull(s.getDuration());
+        assertNull(s.getEndTime(), "Без duration вычислять endTime нельзя");
     }
 
-    // 4) Хранение и изменение epicId (модельный уровень)
+    // 4) Конструктор без времени — поля времени null, epicId сохраняется
     @Test
-    void epicIdIsStoredAndCanBeChanged() {
-        Subtask s = new Subtask("Name", "Desc", Status.NEW, 42);
-        assertEquals(42, s.getEpicId(), "Изначальный epicId должен совпадать с переданным в конструктор");
+    void ctor_withoutTime_keepsEpicId_andNullTimes() {
+        int epicId = 101;
+        Subtask s = new Subtask("Plain sub", "desc", Status.IN_PROGRESS, epicId);
 
-        // Если модель допускает изменение epicId сеттером — проверим это.
-        // (Если сеттера нет по ТЗ, удалите строки ниже.)
-        s.setEpicId(99);
-        assertEquals(99, s.getEpicId(), "После изменения epicId должен обновиться");
+        assertEquals(Status.IN_PROGRESS, s.getStatus());
+        assertEquals(epicId, s.getEpicId());
+        assertNull(s.getStartTime());
+        assertNull(s.getDuration());
+        assertNull(s.getEndTime());
     }
 }

@@ -1,5 +1,4 @@
 package tracker.controllers;
-
 import tracker.exceptions.ManagerSaveException;
 import tracker.model.*;
 
@@ -8,6 +7,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import java.time.Duration;                       // --- NEW (SPRINT-8)
+import java.time.LocalDateTime;                  // --- NEW (SPRINT-8)
+import java.time.format.DateTimeFormatter;       // --- NEW (SPRINT-8)
+
 
 /**
  * Менеджер с автосохранением в CSV:
@@ -20,7 +24,12 @@ import java.util.stream.Collectors;
  */
 public class FileBackedTaskManager extends InMemoryTaskManager {
 
-    private static final String HEADER = "id,type,name,status,description,epic";
+    private static final String HEADER =
+            "id,type,name,status,description,startTime,durationMinutes,epicId";   // --- NEW (SPRINT-8)
+
+    private static final DateTimeFormatter FMT =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");   // SPRINT-8
+
     private final File file;
 
     public FileBackedTaskManager(File file) {
@@ -165,77 +174,84 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
         return s == null ? "" : s.replace("\n", " ").replace("\r", " ");
     }
 
-    private static String taskToCsv(Task t) {
-        return String.join(",",
-                Integer.toString(t.getId()),
-                TaskType.TASK.name(),
-                escape(t.getTitle()),
-                t.getStatus().name(),
-                escape(t.getDescription()),
-                "" // epic id пустой
-        );
-    }
+     private static String taskToCsv(Task t) { // SPRINT-8
+             String start = (t.getStartTime() == null) ? "" : t.getStartTime().format(FMT);
+             String dur   = (t.getDuration()  == null) ? "" : String.valueOf(t.getDuration().toMinutes());
+             return String.join(",",
+                             Integer.toString(t.getId()),
+                             TaskType.TASK.name(),
+                             escape(t.getTitle()),
+                             t.getStatus().name(),
+                             escape(t.getDescription()),
+                             start,              // startTime
+                             dur,                // durationMinutes
+                             ""                  // epicId пусто
+                             );
+         }
 
-    private static String epicToCsv(Epic e) {
-        return String.join(",",
-                Integer.toString(e.getId()),
-                TaskType.EPIC.name(),
-                escape(e.getTitle()),
-                e.getStatus().name(),
-                escape(e.getDescription()),
-                "" // epic id пустой
-        );
-    }
+     private static String epicToCsv(Epic e) { // SPRINT-8
+             // агрегаты времени эпика не пишем — пересчитаются при загрузке
+                     return String.join(",",
+                             Integer.toString(e.getId()),
+                             TaskType.EPIC.name(),
+                             escape(e.getTitle()),
+                             e.getStatus().name(),
+                             escape(e.getDescription()),
+                             "",                 // startTime
+                             "",                 // durationMinutes
+                             ""                  // epicId
+                             );
+         }
 
-    private static String subtaskToCsv(Subtask s) {
-        return String.join(",",
-                Integer.toString(s.getId()),
-                TaskType.SUBTASK.name(),
-                escape(s.getTitle()),
-                s.getStatus().name(),
-                escape(s.getDescription()),
-                Integer.toString(s.getEpicId())
-        );
-    }
+     private static String subtaskToCsv(Subtask s) { // SPRINT-8
+             String start = (s.getStartTime() == null) ? "" : s.getStartTime().format(FMT);
+             String dur   = (s.getDuration()  == null) ? "" : String.valueOf(s.getDuration().toMinutes());
+             return String.join(",",
+                             Integer.toString(s.getId()),
+                             TaskType.SUBTASK.name(),
+                             escape(s.getTitle()),
+                             s.getStatus().name(),
+                             escape(s.getDescription()),
+                             start,              // startTime
+                             dur,                // durationMinutes
+                             Integer.toString(s.getEpicId())
+                             );
+         }
 
-    private static TaskType parseType(String s) {
-        return TaskType.valueOf(s);
-    }
+     private static Task taskFromCsv(String line) { // SPRINT-8
+             // id,type,name,status,description,startTime,durationMinutes,epicId
+                     String[] p = line.split(",", -1);
+             if (p.length < 8) {
+                     throw new ManagerSaveException("Неверная строка CSV (ожидалось 8 столбцов): " + line);
+                 }
 
-    private static Status parseStatus(String s) {
-        return Status.valueOf(s);
-    }
+                     int id = Integer.parseInt(p[0]);
+             TaskType type = TaskType.valueOf(p[1]);
+             String name = p[2];
+             Status status = Status.valueOf(p[3]);
+             String description = p[4];
 
-    private static Task taskFromCsv(String line) {
-        // id,type,name,status,description,epic
-        String[] p = line.split(",", -1);
-        int id = Integer.parseInt(p[0]);
-        TaskType type = parseType(p[1]);
-        String name = p[2];
-        Status status = parseStatus(p[3]);
-        String description = p[4];
+                     LocalDateTime start = p[5].isEmpty() ? null : LocalDateTime.parse(p[5], FMT);
+             Duration duration   = p[6].isEmpty() ? null : Duration.ofMinutes(Long.parseLong(p[6]));
+             String epicIdStr    = p[7];
 
-        switch (type) {
-            case TASK -> {
-                Task t = new Task(name, description, status);
-                t.setId(id);
-                return t;
-            }
-            case EPIC -> {
-                Epic e = new Epic(name, description);
-                e.setId(id);
-                e.setStatusDirect(status);
-                return e;
-            }
-            case SUBTASK -> {
-                int epicId = Integer.parseInt(p[5]);
-                Subtask s = new Subtask(name, description, status, epicId);
-                s.setId(id);
-                return s;
-            }
-            default -> throw new IllegalStateException("Неизвестный тип: " + type);
-        }
-    }
+                     return switch (type) {
+                     case TASK -> new Task(id, name, description, status, start, duration);
+                     case EPIC -> {
+                             Epic e = new Epic(id, name, description); // агрегаты пересчитаются после загрузки
+                             e.setStatusDirect(status);
+                             yield e;
+                         }
+                     case SUBTASK -> {
+                             if (epicIdStr.isEmpty())
+                                     throw new ManagerSaveException("Subtask без epicId: " + line);
+                             int epicId = Integer.parseInt(epicIdStr);
+                             yield new Subtask(id, name, description, status, epicId, start, duration);
+                         }
+                 };
+         }
+
+
 
     // ----------------- Загрузка -----------------
 
@@ -277,26 +293,30 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
             // nextId = maxId+1
             mgr.setNextId(maxId + 1);
 
+            // --- SPRINT-8: пересчитать агрегаты эпиков после загрузки (status/start/duration/end)
+            for (Epic e : mgr.getAllEpics()) {
+                mgr.updateEpicStatus(e);
+                }
+
             // история (если есть строки ещё)
             if (i < lines.size()) {
                 String historyLine = lines.get(i).trim();
                 if (!historyLine.isEmpty()) {
                     for (String part : historyLine.split(",")) {
-                        int id = Integer.parseInt(part.trim());
-                        // восстанавливаем историю, вызывая get* (они добавят в historyManager)
-                        if (mgr.tasks.containsKey(id)) {
-                            mgr.getTask(id);
-                        } else if (mgr.epics.containsKey(id)) {
-                            mgr.getEpic(id);
-                        } else if (mgr.subtasks.containsKey(id)) {
-                            mgr.getSubtask(id);
-                        }
+                        int hid = Integer.parseInt(part.trim());
+                        // пробуем по очереди: task -> epic -> subtask
+                        if (mgr.getTask(hid) != null) continue;
+                        if (mgr.getEpic(hid) != null) continue;
+                        mgr.getSubtask(hid); // если и это null — просто не попадёт в историю
                     }
                 }
             }
+
             return mgr;
         } catch (IOException e) {
             throw new ManagerSaveException("Ошибка чтения файла " + file, e);
+        } catch (RuntimeException e) {
+            throw new ManagerSaveException("Ошибка разбора CSV в файле " + file + ": " + e.getMessage(), e);
         }
     }
 }

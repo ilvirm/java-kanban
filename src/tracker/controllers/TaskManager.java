@@ -55,5 +55,21 @@ public interface TaskManager {
      */
     List<Task> getHistory();  // 🔧 Добавлен метод истории
 
-    List<Integer> getEpicSubtaskIds(int epicId);
+  //  List<Integer> getEpicSubtaskIds(int epicId);
+
+    // --- SPRINT-8: ПРИОРИТИЗАЦИЯ И ПРОВЕРКА ПЕРЕСЕЧЕНИЙ ---
+
+    /**
+     * Возвращает задачи в приоритетном порядке для планирования.
+     * Сортировка: по startTime по возрастанию; записи с null startTime идут в конце; при равенстве — по id.
+     * Реализация может поддерживать внутренний индекс (например, TreeSet) и обновлять его при create/update/delete.
+     *
+     * Этот список используется в реализациях для:
+     *  1) Показать упорядоченный план работ;
+     *  2) Быстро проверять пересечения интервалов времени при добавлении/изменении задач.
+     */
+    List<Task> getPrioritizedTasks(); // Новое для спринта-8
+
+    // Проверяет, пересекается ли candidate с любой другой задачей менеджера
+    boolean hasOverlaps(Task candidate);
 }
