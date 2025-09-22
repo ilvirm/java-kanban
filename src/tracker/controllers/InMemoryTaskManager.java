@@ -30,17 +30,23 @@ public class InMemoryTaskManager implements TaskManager {
     private final NavigableSet<Task> prioritized = new TreeSet<>(BY_START_THEN_ID);
 
     // --- NEW (SPRINT-8): помощники индекса приоритизации
+
     private void index(Task t) {
         if (t != null && t.getStartTime() != null) {
             prioritized.add(t);
         }
     }
-    private void deindex(Task t) { if (t != null) prioritized.remove(t); }
+
+    private void deindex(Task t) {
+        if (t != null) {
+            prioritized.remove(t);
+        }
+    }
 
     // --- NEW (SPRINT-8): проверка пересечения интервалов [start, end)
     private static boolean overlaps(Task a, Task b) {
         LocalDateTime as = a.getStartTime(), bs = b.getStartTime();
-        Duration ad = a.getDuration(),    bd = b.getDuration();
+        Duration ad = a.getDuration(), bd = b.getDuration();
         if (as == null || ad == null || bs == null || bd == null) return false; // «без времени» — не конфликтуют
         LocalDateTime ae = a.getEndTime(), be = b.getEndTime(); // end = start + duration (уже есть в моделях)
         return as.isBefore(be) && bs.isBefore(ae); // полуинтервалы: [start, end)
@@ -61,12 +67,16 @@ public class InMemoryTaskManager implements TaskManager {
 
     // --- FileBackedTaskManager ---
 
-    /** Устанавливает nextId (= maxId+1) при восстановлении из файла. */
+    /**
+     * Устанавливает nextId (= maxId+1) при восстановлении из файла.
+     */
     protected final void setNextId(int nextId) {
         this.currentId = Math.max(nextId, this.currentId);
     }
 
-    /** Вставка Task с уже заданным id (без генерации id и без истории). */
+    /**
+     * Вставка Task с уже заданным id (без генерации id и без истории).
+     */
     protected final void addTaskWithCustomId(Task task) {
         tasks.put(task.getId(), task);
         // индексируем, чтобы getPrioritizedTasks() был корректным после загрузки
@@ -74,12 +84,16 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
 
-    /** Вставка Epic с уже заданным id (без генерации id и без истории). */
+    /**
+     * Вставка Epic с уже заданным id (без генерации id и без истории).
+     */
     protected final void addEpicWithCustomId(Epic epic) {
         epics.put(epic.getId(), epic);
     }
 
-    /** Вставка Subtask с уже заданным id + привязка к эпику + пересчёт статуса эпика. */
+    /**
+     * Вставка Subtask с уже заданным id + привязка к эпику + пересчёт статуса эпика.
+     */
     protected final void addSubtaskWithCustomId(Subtask subtask) {
         subtasks.put(subtask.getId(), subtask);
         Epic epic = epics.get(subtask.getEpicId());
@@ -399,7 +413,7 @@ public class InMemoryTaskManager implements TaskManager {
 
         // --- NEW (SPRINT-8): объявляем агрегаторы времени перед циклом
         LocalDateTime minStart = null;
-        LocalDateTime maxEnd   = null;
+        LocalDateTime maxEnd = null;
         long totalMinutes = 0;
 
         for (int id : subtaskIds) {
