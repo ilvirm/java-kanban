@@ -90,9 +90,14 @@ public class Epic extends Task {
     }
 
     // --- NEW (SPRINT-8): прямые методы для менеджера (нужны public — другой пакет)
-    public void setStartTimeDirect(LocalDateTime startTime) { super.setStartTime(startTime); }
-    public void setDurationDirect(Duration duration)       { super.setDuration(duration); }
-    public void setEndTimeDirect(LocalDateTime endTime)    { this.endTimeAgg = endTime; }
+    public void setStartTimeDirect(LocalDateTime startTime) {
+        super.setStartTime(startTime); }
+
+    public void setDurationDirect(Duration duration)       {
+        super.setDuration(duration); }
+
+    public void setEndTimeDirect(LocalDateTime endTime)    {
+        this.endTimeAgg = endTime; }
 
     // (опционально) запрет ручных сеттеров времени у эпика:
     @Override public void setStartTime(LocalDateTime startTime) { /* no-op */ }
