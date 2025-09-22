@@ -51,6 +51,9 @@ public class Subtask extends Task {
                 ", endTime=" + getEndTime() +
                 '}';
     }
+
     @Override
-    public TaskType getType() { return TaskType.SUBTASK; }
+    public TaskType getType() {
+        return TaskType.SUBTASK;
+    }
 }
