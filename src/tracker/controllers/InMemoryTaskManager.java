@@ -99,7 +99,7 @@ public class InMemoryTaskManager implements TaskManager {
         Epic epic = epics.get(subtask.getEpicId());
         if (epic != null) {
             epic.addSubtaskId(subtask.getId());
-            updateEpicStatus(epic);
+            updateEpicStatusSilently(epic);
         }
         // индексируем сабтаск тоже
         index(subtask);
@@ -464,5 +464,62 @@ public class InMemoryTaskManager implements TaskManager {
         epic.setStartTimeDirect(minStart);
         epic.setDurationDirect(totalMinutes == 0 ? null : Duration.ofMinutes(totalMinutes));
         epic.setEndTimeDirect(maxEnd);
+    }
+
+    // прямой доступ по id без записи в историю
+    protected Task peekAny(int id) {
+        Task t = tasks.get(id);
+        if (t != null) return t;
+        Task s = subtasks.get(id);
+        if (s != null) return s;
+        return epics.get(id);
+    }
+    // «тихий» пересчёт для одного эпика — без истории/сохранений и без публичных get*()
+    protected void updateEpicStatusSilently(Epic e) {
+        if (e == null) return;
+
+        long totalMin = 0L;
+        LocalDateTime start = null, end = null;
+
+        boolean allNew = true;
+        boolean allDone = true;
+
+        for (Integer sid : e.getSubtaskIds()) {
+            Subtask s = subtasks.get(sid);
+            if (s == null) continue;
+
+            // статус
+            Status st = s.getStatus();
+            if (st != Status.NEW)  allNew = false;
+            if (st != Status.DONE) allDone = false;
+
+            // агрегаты времени
+            if (s.getStartTime() != null && s.getDuration() != null) {
+                if (start == null || s.getStartTime().isBefore(start)) {
+                    start = s.getStartTime();
+                }
+                LocalDateTime sEnd = s.getEndTime();
+                if (sEnd != null && (end == null || sEnd.isAfter(end))) {
+                    end = sEnd;
+                }
+                totalMin += s.getDuration().toMinutes();
+            }
+        }
+
+        // статус эпика напрямую
+        if (e.getSubtaskIds().isEmpty()) {
+            e.setStatusDirect(Status.NEW);
+        } else if (allDone) {
+            e.setStatusDirect(Status.DONE);
+        } else if (allNew) {
+            e.setStatusDirect(Status.NEW);
+        } else {
+            e.setStatusDirect(Status.IN_PROGRESS);
+        }
+
+        // время эпика напрямую
+        e.setStartTimeDirect(start);
+        e.setDurationDirect(totalMin == 0 ? null : Duration.ofMinutes(totalMin));
+        e.setEndTimeDirect(end);
     }
 }

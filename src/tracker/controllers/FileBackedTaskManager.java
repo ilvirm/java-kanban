@@ -294,27 +294,24 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                     mgr.addTaskWithCustomId(t);
                 }
             }
-
             // nextId = maxId+1
             mgr.setNextId(maxId + 1);
 
-            // 1) СНАЧАЛА восстановить историю — строго в записанном порядке (без get* и без save())
+    // 1) СНАЧАЛА — тихий пересчёт эпиков (без истории и без публичных get*)
+            for (Epic e : mgr.getAllEpics()) {
+                mgr.updateEpicStatusSilently(e);
+            }
+
+    // 2) ПОТОМ — восстановление истории в точном порядке (без публичных get* и без save())
             if (i < lines.size()) {
                 String historyLine = lines.get(i).trim();
                 if (!historyLine.isEmpty()) {
                     for (String part : historyLine.split(",")) {
                         int hid = Integer.parseInt(part.trim());
-                        Task t = mgr.tasks.get(hid);
-                        if (t == null) t = mgr.epics.get(hid);
-                        if (t == null) t = mgr.subtasks.get(hid);
-                        mgr.addToHistoryDirect(t);
+                        Task t = mgr.peekAny(hid); // прямой доступ к мапам
+                        if (t != null) mgr.addToHistoryDirect(t);
                     }
                 }
-            }
-
-            // 2) ПОТОМ пересчитать агрегаты по всем эпикам (status/start/duration/end)
-            for (Epic e : mgr.getAllEpics()) {
-                mgr.updateEpicStatus(e); // важно: не updateEpic(e), чтобы не было save()
             }
 
             return mgr;
