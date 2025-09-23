@@ -523,6 +523,7 @@ public class InMemoryTaskManager implements TaskManager {
         e.setDurationDirect(totalMin == 0 ? null : Duration.ofMinutes(totalMin));
         e.setEndTimeDirect(end);
     }
+    
     protected Task getTaskForHistory(int id) {
         // Порядок должен соответствовать ожидаемому в тесте: Task -> Epic -> Subtask
         if (tasks.containsKey(id)) return tasks.get(id);
