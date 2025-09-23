@@ -308,7 +308,8 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                 if (!historyLine.isEmpty()) {
                     for (String part : historyLine.split(",")) {
                         int hid = Integer.parseInt(part.trim());
-                        Task t = mgr.getAnyTaskDirectly(hid); // прямой доступ к мапам
+                        //Task t = mgr.getAnyTaskDirectly(hid); // прямой доступ к мапам
+                        Task t = mgr.peekAny(hid);
                         if (t != null) mgr.addToHistoryDirect(t);
                     }
                 }
