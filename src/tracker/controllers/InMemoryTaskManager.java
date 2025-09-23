@@ -475,6 +475,7 @@ public class InMemoryTaskManager implements TaskManager {
         return epics.get(id);
     }
     // «тихий» пересчёт для одного эпика — без истории/сохранений и без публичных get*()
+    
     protected void updateEpicStatusSilently(Epic e) {
         if (e == null) return;
 
