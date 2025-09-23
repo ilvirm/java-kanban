@@ -38,6 +38,9 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
 
     private final File file;
 
+    // ── NEW: флаг «идёт загрузка», чтобы подавить побочные эффекты (history/save)
+    private volatile boolean isLoading = false;
+
     public FileBackedTaskManager(File file) {
         this.file = Objects.requireNonNull(file, "file is null");
     }
@@ -119,9 +122,15 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
         save();
     }
 
-    // Просмотры тоже сохраняем, чтобы история не терялась
+    // Просмотры тоже сохраняем (кроме режима загрузки из файла),
+    // чтобы история не терялась между изменениями.
     @Override
     public Task getTask(int id) {
+        // ── NEW: во время загрузки отдаем напрямую без записи в историю и без save()
+        if (isLoading) {
+            Task t = super.getTaskForHistory(id); // прямой доступ к мапам из базового класса
+            return t;
+        }
         Task t = super.getTask(id);
         if (t != null) save();
         return t;
@@ -129,13 +138,24 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
 
     @Override
     public Epic getEpic(int id) {
+        // ── NEW: во время загрузки не трогаем историю
+        if (isLoading) {
+            Task any = super.getTaskForHistory(id);
+            return (Epic) any;
+        }
         Epic e = super.getEpic(id);
+
         if (e != null) save();
         return e;
     }
 
     @Override
     public Subtask getSubtask(int id) {
+        // ── NEW: во время загрузки не трогаем историю
+        if (isLoading) {
+            Task any = super.getTaskForHistory(id);
+            return (Subtask) any;
+        }
         Subtask s = super.getSubtask(id);
         if (s != null) save();
         return s;
@@ -144,6 +164,8 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
     // ----------------- Сохранение задач в CSV-файл -----------------
 
     protected void save() {
+        // ── NEW: во время loadFromFile() не пишем файл
+        if (isLoading) return;
         try (BufferedWriter bw = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
             bw.write(HEADER);
             bw.newLine();
@@ -269,6 +291,9 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
             List<String> lines = Files.readAllLines(file.toPath(), StandardCharsets.UTF_8);
             if (lines.isEmpty()) return mgr;
 
+            // ── NEW: включаем «тихий режим» на время парсинга и пересчёта
+            mgr.isLoading = true;
+
             int i = 0;
             if (!HEADER.equals(lines.get(i))) {
                 throw new ManagerSaveException("Некорректный заголовок CSV в " + file);
@@ -302,14 +327,16 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                 mgr.updateEpicStatusSilently(e);
             }
 
+            // ── NEW: выключаем «тихий режим» перед восстановлением истории
+            mgr.isLoading = false;
+
             // 2) ПОТОМ — восстановление истории в точном порядке (без публичных get* и без save())
             if (i < lines.size()) {
                 String historyLine = lines.get(i).trim();
                 if (!historyLine.isEmpty()) {
                     for (String part : historyLine.split(",")) {
                         int hid = Integer.parseInt(part.trim());
-                        //Task t = mgr.getAnyTaskDirectly(hid); // прямой доступ к мапам
-                        //Task t = mgr.peekAny(hid);
+                        // прямой доступ без побочных эффектов
                         Task t = mgr.getTaskForHistory(hid);
                         if (t != null) mgr.addToHistoryDirect(t);
                     }
@@ -322,17 +349,5 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
         } catch (RuntimeException e) {
             throw new ManagerSaveException("Ошибка разбора CSV в файле " + file + ": " + e.getMessage(), e);
         }
-    }
-
-    //Метод для прямого доступа к задачам
-    private Task getAnyTaskDirectly(int id) {
-        if (tasks.containsKey(id)) {
-            return tasks.get(id);
-        } else if (epics.containsKey(id)) {
-            return epics.get(id);
-        } else if (subtasks.containsKey(id)) {
-            return subtasks.get(id);
-        }
-        return null;
     }
 }
