@@ -297,19 +297,20 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
             // nextId = maxId+1
             mgr.setNextId(maxId + 1);
 
-    // 1) СНАЧАЛА — тихий пересчёт эпиков (без истории и без публичных get*)
+            // 1) СНАЧАЛА — тихий пересчёт эпиков (без истории и без публичных get*)
             for (Epic e : mgr.getAllEpics()) {
                 mgr.updateEpicStatusSilently(e);
             }
 
-    // 2) ПОТОМ — восстановление истории в точном порядке (без публичных get* и без save())
+            // 2) ПОТОМ — восстановление истории в точном порядке (без публичных get* и без save())
             if (i < lines.size()) {
                 String historyLine = lines.get(i).trim();
                 if (!historyLine.isEmpty()) {
                     for (String part : historyLine.split(",")) {
                         int hid = Integer.parseInt(part.trim());
                         //Task t = mgr.getAnyTaskDirectly(hid); // прямой доступ к мапам
-                        Task t = mgr.peekAny(hid);
+                        //Task t = mgr.peekAny(hid);
+                        Task t = mgr.getTaskForHistory(hid);
                         if (t != null) mgr.addToHistoryDirect(t);
                     }
                 }
