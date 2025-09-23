@@ -308,7 +308,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                 if (!historyLine.isEmpty()) {
                     for (String part : historyLine.split(",")) {
                         int hid = Integer.parseInt(part.trim());
-                        Task t = mgr.peekAny(hid); // прямой доступ к мапам
+                        Task t = mgr.getAnyTaskDirectly(hid); // прямой доступ к мапам
                         if (t != null) mgr.addToHistoryDirect(t);
                     }
                 }
@@ -320,5 +320,17 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
         } catch (RuntimeException e) {
             throw new ManagerSaveException("Ошибка разбора CSV в файле " + file + ": " + e.getMessage(), e);
         }
+    }
+
+    //Метод для прямого доступа к задачам
+    private Task getAnyTaskDirectly(int id) {
+        if (tasks.containsKey(id)) {
+            return tasks.get(id);
+        } else if (epics.containsKey(id)) {
+            return epics.get(id);
+        } else if (subtasks.containsKey(id)) {
+            return subtasks.get(id);
+        }
+        return null;
     }
 }
