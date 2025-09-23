@@ -154,7 +154,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
         // ── NEW: во время загрузки не трогаем историю
         if (isLoading) {
             Task any = super.getTaskForHistory(id);
-            return (Subtask) any;
+            return (any instanceof Subtask) ? (Subtask) any : null;
         }
         Subtask s = super.getSubtask(id);
         if (s != null) save();
@@ -327,9 +327,6 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                 mgr.updateEpicStatusSilently(e);
             }
 
-            // ── NEW: выключаем «тихий режим» перед восстановлением истории
-            mgr.isLoading = false;
-
             // 2) ПОТОМ — восстановление истории в точном порядке (без публичных get* и без save())
             if (i < lines.size()) {
                 String historyLine = lines.get(i).trim();
@@ -349,5 +346,17 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
         } catch (RuntimeException e) {
             throw new ManagerSaveException("Ошибка разбора CSV в файле " + file + ": " + e.getMessage(), e);
         }
+    }
+
+    // ── NEW: «разморозка» истории на первом вызове.
+    // Пока isLoading=true, get*/save() не трогают историю.
+    // Первый вызов getHistory() возвращает снимок и снимает флаг — дальше всё работает обычно.
+    @Override
+    public List<Task> getHistory() {
+        List<Task> snapshot = super.getHistory();
+        if (isLoading) {
+            isLoading = false;
+        }
+        return snapshot;
     }
 }
