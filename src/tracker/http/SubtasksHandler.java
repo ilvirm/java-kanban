@@ -20,7 +20,6 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import tracker.controllers.TaskManager;
 import tracker.model.Subtask;
-import tracker.model.Status;
 
 import java.io.IOException;
 
