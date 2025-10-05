@@ -20,9 +20,9 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import tracker.controllers.TaskManager;
 import tracker.model.Subtask;
+import tracker.model.Status;
 
 import java.io.IOException;
-import java.util.ArrayList;
 
 public class SubtasksHandler extends BaseHttpHandler implements HttpHandler {
     private final TaskManager manager;
@@ -35,11 +35,19 @@ public class SubtasksHandler extends BaseHttpHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange h) throws IOException {
         try {
-            switch (h.getRequestMethod()) {
-                case "GET"    -> handleGet(h);
-                case "POST"   -> handlePost(h);
-                case "DELETE" -> handleDelete(h);
-                default       -> sendServerError(h, "Unsupported method");
+            String method = h.getRequestMethod();
+            switch (method) {
+                case "GET":
+                    handleGet(h);
+                    break;
+                case "POST":
+                    handlePost(h);
+                    break;
+                case "DELETE":
+                    handleDelete(h);
+                    break;
+                default:
+                    sendServerError(h, "Unsupported method");
             }
         } catch (Exception e) {
             sendServerError(h, e.getMessage());
@@ -49,11 +57,13 @@ public class SubtasksHandler extends BaseHttpHandler implements HttpHandler {
     private void handleGet(HttpExchange h) throws IOException {
         Integer id = pathId(h);
         if (id == null) {
-            ArrayList<Subtask> all = manager.getAllSubtasks();
-            sendOk(h, all);
+            sendOk(h, manager.getAllSubtasks());
         } else {
             Subtask s = manager.getSubtask(id);
-            if (s == null) { sendNotFound(h, "Subtask " + id + " not found"); return; }
+            if (s == null) {
+                sendNotFound(h, "Subtask " + id + " not found");
+                return;
+            }
             sendOk(h, s);
         }
     }
@@ -61,9 +71,11 @@ public class SubtasksHandler extends BaseHttpHandler implements HttpHandler {
     private void handlePost(HttpExchange h) throws IOException {
         Subtask incoming = gson.fromJson(readBody(h), Subtask.class);
         if (incoming.getId() == 0) {
+            // создание
             manager.addSubtask(incoming);
             sendCreated(h, incoming);
         } else {
+            // обновление
             if (manager.getSubtask(incoming.getId()) == null) {
                 sendNotFound(h, "Subtask " + incoming.getId() + " not found");
                 return;
@@ -88,4 +100,3 @@ public class SubtasksHandler extends BaseHttpHandler implements HttpHandler {
         }
     }
 }
-
