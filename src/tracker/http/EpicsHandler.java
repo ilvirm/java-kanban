@@ -23,7 +23,6 @@ import tracker.controllers.TaskManager;
 import tracker.model.Epic;
 
 import java.io.IOException;
-import java.util.ArrayList;
 
 public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
     private final TaskManager manager;
@@ -39,11 +38,19 @@ public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
             String path = h.getRequestURI().getPath(); // /epics | /epics/{id} | /epics/{id}/subtasks
             String[] parts = path.split("/");
 
-            switch (h.getRequestMethod()) {
-                case "GET" -> handleGet(h, parts);
-                case "POST" -> handlePost(h);
-                case "DELETE" -> handleDelete(h);
-                default -> sendServerError(h, "Unsupported method");
+            String method = h.getRequestMethod();
+            switch (method) {
+                case "GET":
+                    handleGet(h, parts);
+                    break;
+                case "POST":
+                    handlePost(h);
+                    break;
+                case "DELETE":
+                    handleDelete(h);
+                    break;
+                default:
+                    sendServerError(h, "Unsupported method");
             }
         } catch (Exception e) {
             sendServerError(h, e.getMessage());
@@ -54,11 +61,16 @@ public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
         // /epics/{id}/subtasks
         if (parts.length == 4 && "subtasks".equals(parts[3])) {
             int epicId;
-            try { epicId = Integer.parseInt(parts[2]); } catch (NumberFormatException e) {
-                sendNotFound(h, "Invalid epic id"); return;
+            try {
+                epicId = Integer.parseInt(parts[2]);
+            } catch (NumberFormatException e) {
+                sendNotFound(h, "Invalid epic id");
+                return;
             }
-            Epic e = manager.getEpic(epicId);
-            if (e == null) { sendNotFound(h, "Epic " + epicId + " not found"); return; }
+            if (manager.getEpic(epicId) == null) {
+                sendNotFound(h, "Epic " + epicId + " not found");
+                return;
+            }
             sendOk(h, manager.getSubtasksOfEpic(epicId));
             return;
         }
@@ -66,27 +78,29 @@ public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
         // /epics или /epics/{id}
         Integer id = pathId(h);
         if (id == null) {
-            ArrayList<Epic> all = manager.getAllEpics();
-            sendOk(h, all);
+            sendOk(h, manager.getAllEpics());
         } else {
             Epic e = manager.getEpic(id);
-            if (e == null) { sendNotFound(h, "Epic " + id + " not found"); return; }
+            if (e == null) {
+                sendNotFound(h, "Epic " + id + " not found");
+                return;
+            }
             sendOk(h, e);
         }
     }
 
     private void handlePost(HttpExchange h) throws IOException {
-        Epic incoming = gson.fromJson(readBody(h), Epic.class);
-        if (incoming.getId() == 0) {
-            manager.addEpic(incoming);
-            sendCreated(h, incoming);
+        Epic epic = gson.fromJson(readBody(h), Epic.class);
+        if (epic.getId() == 0) {
+            manager.addEpic(epic);
+            sendCreated(h, epic);
         } else {
-            if (manager.getEpic(incoming.getId()) == null) {
-                sendNotFound(h, "Epic " + incoming.getId() + " not found");
+            if (manager.getEpic(epic.getId()) == null) {
+                sendNotFound(h, "Epic " + epic.getId() + " not found");
                 return;
             }
-            manager.updateEpic(incoming);
-            sendCreated(h, incoming);
+            manager.updateEpic(epic);
+            sendCreated(h, epic);
         }
     }
 
