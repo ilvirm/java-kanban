@@ -23,15 +23,19 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
+
 public abstract class BaseHttpHandler {
+
     protected final Gson gson;
 
-    protected BaseHttpHandler() {
-
-        this.gson = new GsonBuilder().serializeNulls().create();
+    // пустая строка перед конструктором (EmptyLineSeparator)
+    public BaseHttpHandler() {
+        this.gson = new GsonBuilder()
+                .serializeNulls()
+                .create();
     }
 
-    // ==== успешно ====
+    // ===== успех =====
     protected void sendOk(HttpExchange h, Object payload) throws IOException {
         sendJson(h, 200, payload);
     }
@@ -40,7 +44,7 @@ public abstract class BaseHttpHandler {
         sendJson(h, 201, payload);
     }
 
-    // ==== ошибки ====
+    // ===== ошибки =====
     protected void sendNotFound(HttpExchange h, String message) throws IOException {
         sendJson(h, 404, new ErrorDto(message == null ? "Not Found" : message));
     }
@@ -50,16 +54,22 @@ public abstract class BaseHttpHandler {
     }
 
     private void sendJson(HttpExchange h, int code, Object payload) throws IOException {
-        byte[] body = payload == null ? new byte[0] :
-                gson.toJson(payload).getBytes(StandardCharsets.UTF_8);
+        byte[] body = (payload == null)
+                ? new byte[0]
+                : gson.toJson(payload).getBytes(StandardCharsets.UTF_8);
+
         h.getResponseHeaders().add("Content-Type", "application/json; charset=utf-8");
         h.sendResponseHeaders(code, body.length);
+
+        // переносы строк внутри блока и пробелы вокруг { } (WhitespaceAround, Left/RightCurly)
         if (body.length > 0) {
             h.getResponseBody().write(body);
         }
+
         h.close();
     }
 
+    // ===== вспомогательные =====
     protected String readBody(HttpExchange h) throws IOException {
         try (InputStream is = h.getRequestBody()) {
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
@@ -72,13 +82,19 @@ public abstract class BaseHttpHandler {
         if (parts.length >= 3) {
             try {
                 return Integer.parseInt(parts[2]);
-            } catch (NumberFormatException ignored) {}
+            } catch (NumberFormatException ignored) {
+                // ignore
+            }
         }
         return null;
     }
 
+    // закрывающая скобка класса — на своей строке (RightCurlyAlone)
     static final class ErrorDto {
         final String message;
-        ErrorDto(String message) { this.message = message; }
+
+        ErrorDto(String message) {
+            this.message = message;
+        }
     }
 }
