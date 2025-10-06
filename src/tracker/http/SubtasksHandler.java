@@ -20,15 +20,13 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import tracker.controllers.TaskManager;
 import tracker.model.Subtask;
+import tracker.http.BaseHttpHandler.BadRequestException;
 
 import java.io.IOException;
 
 public class SubtasksHandler extends BaseHttpHandler implements HttpHandler {
-    private final TaskManager manager;
-
     public SubtasksHandler(TaskManager manager) {
-        super();
-        this.manager = manager;
+        super(manager);
     }
 
     @Override
@@ -46,15 +44,25 @@ public class SubtasksHandler extends BaseHttpHandler implements HttpHandler {
                     handleDelete(h);
                     break;
                 default:
-                    sendServerError(h, "Unsupported method");
+                    // 405 + Allow для неподдерживаемых методов
+                    sendMethodNotAllowed(h, "Method not allowed", "GET, POST, DELETE");
             }
+        } catch (BadRequestException e) {
+            sendBadRequest(h, e.getMessage());
         } catch (Exception e) {
             sendServerError(h, e.getMessage());
         }
     }
 
     private void handleGet(HttpExchange h) throws IOException {
+        // различаем "id отсутствует" и "id не число" → 400
+        String[] parts = h.getRequestURI().getPath().split("/");
         Integer id = pathId(h);
+        // если сегмент с ID есть, но распарсить его не удалось — 400
+        if (parts.length >= 3 && parts[2] != null && !parts[2].isBlank() && id == null) {
+            sendBadRequest(h, "Invalid subtask id");
+            return;
+        }
         if (id == null) {
             sendOk(h, manager.getAllSubtasks());
         } else {
@@ -68,7 +76,22 @@ public class SubtasksHandler extends BaseHttpHandler implements HttpHandler {
     }
 
     private void handlePost(HttpExchange h) throws IOException {
-        Subtask incoming = gson.fromJson(readBody(h), Subtask.class);
+
+        String body = readBody(h);
+        if (body == null || body.isBlank()) {
+            throw new BadRequestException("Empty request body");
+        }
+
+        Subtask incoming;
+        try {
+            incoming = gson.fromJson(body, Subtask.class);
+        } catch (Exception parse) {
+            throw new BadRequestException("Invalid JSON");
+        }
+        if (incoming == null) {
+            throw new BadRequestException("Invalid JSON");
+        }
+
         if (incoming.getId() == 0) {
             // создание
             manager.addSubtask(incoming);
@@ -80,12 +103,18 @@ public class SubtasksHandler extends BaseHttpHandler implements HttpHandler {
                 return;
             }
             manager.updateSubtask(incoming);
-            sendCreated(h, incoming);
+            sendOk(h, incoming); // 200 OK на update
         }
     }
 
     private void handleDelete(HttpExchange h) throws IOException {
+        String[] parts = h.getRequestURI().getPath().split("/");
         Integer id = pathId(h);
+        // если сегмент с ID есть, но распарсить его не удалось — 400
+        if (parts.length >= 3 && parts[2] != null && !parts[2].isBlank() && id == null) {
+            sendBadRequest(h, "Invalid subtask id");
+            return;
+        }
         if (id == null) {
             manager.clearSubtasks();
             sendOk(h, null);

@@ -24,11 +24,8 @@ import tracker.model.Task;
 import java.io.IOException;
 
 public class TasksHandler extends BaseHttpHandler implements HttpHandler {
-    private final TaskManager manager;
-
     public TasksHandler(TaskManager manager) {
-        super();
-        this.manager = manager;
+        super(manager);
     }
 
     @Override

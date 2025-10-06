@@ -18,6 +18,7 @@ package tracker.http;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.sun.net.httpserver.HttpExchange;
+import tracker.controllers.TaskManager;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,9 +28,11 @@ import java.nio.charset.StandardCharsets;
 public abstract class BaseHttpHandler {
 
     protected final Gson gson;
+    protected final TaskManager manager;
 
     // пустая строка перед конструктором (EmptyLineSeparator)
-    public BaseHttpHandler() {
+    public BaseHttpHandler(TaskManager manager) {
+        this.manager = manager;
         this.gson = new GsonBuilder()
                 .serializeNulls()
                 .create();
@@ -53,12 +56,29 @@ public abstract class BaseHttpHandler {
         sendJson(h, 500, new ErrorDto(message == null ? "Internal Server Error" : message));
     }
 
+    // 400 Bad Request
+    public void sendBadRequest(HttpExchange h, String message) throws IOException {
+        sendJson(h, 400, new ErrorDto(message == null ? "Bad Request" : message));
+    }
+
+    protected static class BadRequestException extends RuntimeException {
+        public BadRequestException(String m) { super(m); }
+    }
+
+    // 405 Method Not Allowed (+ заголовок Allow)
+    public void sendMethodNotAllowed(HttpExchange h, String message, String allowHeader) throws IOException {
+        if (allowHeader != null && !allowHeader.isBlank()) {
+            h.getResponseHeaders().set("Allow", allowHeader);
+        }
+        sendJson(h, 405, new ErrorDto(message == null ? "Method Not Allowed" : message));
+    }
+
     private void sendJson(HttpExchange h, int code, Object payload) throws IOException {
         byte[] body = (payload == null)
                 ? new byte[0]
                 : gson.toJson(payload).getBytes(StandardCharsets.UTF_8);
 
-        h.getResponseHeaders().add("Content-Type", "application/json; charset=utf-8");
+        h.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
         h.sendResponseHeaders(code, body.length);
 
         // переносы строк внутри блока и пробелы вокруг { } (WhitespaceAround, Left/RightCurly)

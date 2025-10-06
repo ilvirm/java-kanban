@@ -24,12 +24,10 @@ import tracker.model.Epic;
 
 import java.io.IOException;
 
-public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
-    private final TaskManager manager;
 
+public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
     public EpicsHandler(TaskManager manager) {
-        super();
-        this.manager = manager;
+        super(manager);
     }
 
     @Override
@@ -50,7 +48,8 @@ public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
                     handleDelete(h);
                     break;
                 default:
-                    sendServerError(h, "Unsupported method");
+                    // 405 для неподдерживаемого метода
+                    sendMethodNotAllowed(h, "Method not allowed", "GET, POST, DELETE");
             }
         } catch (Exception e) {
             sendServerError(h, e.getMessage());
@@ -64,7 +63,7 @@ public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
             try {
                 epicId = Integer.parseInt(parts[2]);
             } catch (NumberFormatException e) {
-                sendNotFound(h, "Invalid epic id");
+                sendBadRequest(h, "Invalid epic id");
                 return;
             }
             if (manager.getEpic(epicId) == null) {
@@ -91,6 +90,11 @@ public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
 
     private void handlePost(HttpExchange h) throws IOException {
         Epic epic = gson.fromJson(readBody(h), Epic.class);
+        if (epic == null) {
+            sendBadRequest(h, "Body is empty or invalid JSON");
+            return;
+        }
+
         if (epic.getId() == 0) {
             manager.addEpic(epic);
             sendCreated(h, epic);
