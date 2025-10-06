@@ -103,7 +103,7 @@ public class SubtasksHandler extends BaseHttpHandler implements HttpHandler {
                 return;
             }
             manager.updateSubtask(incoming);
-            sendOk(h, incoming); // 200 OK на update
+            sendCreated(h, incoming);
         }
     }
 
