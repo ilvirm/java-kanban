@@ -62,7 +62,9 @@ public abstract class BaseHttpHandler {
     }
 
     protected static class BadRequestException extends RuntimeException {
-        public BadRequestException(String m) { super(m); }
+        public BadRequestException(String m) {
+            super(m);
+        }
     }
 
     // 405 Method Not Allowed (+ заголовок Allow)
